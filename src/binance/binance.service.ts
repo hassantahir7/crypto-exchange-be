@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WebSocket } from 'ws';
-import { ConfigService } from '@nestjs/config'; // Import ConfigService
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class BinanceService {
@@ -23,13 +23,18 @@ export class BinanceService {
     this.futuresWSBase = this.configService.get<string>('FUTURES_WS_BASE');
   }
 
+  // Connect to Binance WebSockets and relay data to the frontend via the backend WebSocket server
   connectToBinanceStreams(server: any) {
     Object.keys(this.streams).forEach((stream) => {
       const ws = new WebSocket(`${this.binanceWSBase}/${this.streams[stream]}`);
-      ws.onmessage = (event) => {
-        if (event.data === null || event.data === undefined) {
-          return;
-        }
+      
+      ws.on('open', () => {
+        this.logger.log(`Connected to Binance WebSocket stream: ${stream}`);
+      });
+
+      ws.on('message', (event) => {
+        if (event.data === null || event.data === undefined) return;
+
         try {
           const data = JSON.parse(event.data);
           switch (stream) {
@@ -51,16 +56,20 @@ export class BinanceService {
         } catch (error) {
           this.logger.error(`Stream ${stream} - error parsing message: ${error}`);
         }
-      };
-      this.wsConnections.push(ws);
+      });
+
+      ws.on('error', (error) => {
+        this.logger.error(`Error in Binance WebSocket stream (${stream}): ${error}`);
+      });
+
+      this.wsConnections.push(ws); // Store WebSocket connections
     });
 
+    // Futures WebSocket
     const futuresKline = new WebSocket(`${this.futuresWSBase}/btcusdt@kline_1m`);
     futuresKline.onmessage = (event) => {
-      if (event.data === null || event.data === undefined) {
-        this.logger.warn('Futures kline - event.data was null or undefined');
-        return;
-      }
+      if (event.data === null || event.data === undefined) return;
+
       try {
         const data = JSON.parse(event.data);
         server.emit('futuresKline', this.transformKlineData(data));
@@ -68,6 +77,8 @@ export class BinanceService {
         this.logger.error('Futures kline - error parsing message: ' + error);
       }
     };
+
+    this.wsConnections.push(futuresKline);
   }
 
   // Transformation methods
@@ -133,5 +144,11 @@ export class BinanceService {
     } catch (error) {
       this.logger.error('Kline data - error parsing message: ' + error);
     }
+  }
+
+  // Optionally close WebSocket connections to avoid memory leaks
+  closeWebSocketConnections() {
+    this.wsConnections.forEach((ws) => ws.close());
+    this.wsConnections = [];
   }
 }
