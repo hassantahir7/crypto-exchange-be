@@ -64,21 +64,6 @@ export class BinanceService {
 
       this.wsConnections.push(ws); // Store WebSocket connections
     });
-
-    // Futures WebSocket
-    const futuresKline = new WebSocket(`${this.futuresWSBase}/btcusdt@kline_1m`);
-    futuresKline.onmessage = (event) => {
-      if (event.data === null || event.data === undefined) return;
-
-      try {
-        const data = JSON.parse(event.data);
-        server.emit('futuresKline', this.transformKlineData(data));
-      } catch (error) {
-        this.logger.error('Futures kline - error parsing message: ' + error);
-      }
-    };
-
-    this.wsConnections.push(futuresKline);
   }
 
   // Transformation methods
