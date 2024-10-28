@@ -25,7 +25,7 @@ This is a NestJS-based backend project that connects to the Binance WebSocket AP
 Clone the repo using git clone https://github.com/hassantahir7/crypto-exchange-be.git
 
 ## latest branch 
-  main & dev
+  main 
   
 ## Installation
 
