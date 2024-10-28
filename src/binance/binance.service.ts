@@ -26,12 +26,16 @@ export class BinanceService {
   connectToBinanceStreams(server: any) {
     Object.keys(this.streams).forEach((stream) => {
       const ws = new WebSocket(`${this.binanceWSBase}/${this.streams[stream]}`);
-      ws.onmessage = (event) => {
-        if (event.data === null || event.data === undefined) {
-          return;
-        }
+      
+      ws.on('open', () => {
+        this.logger.log(`Connected to Binance WebSocket stream: ${stream}`);
+      });
+
+      ws.on('message', (event) => {
+        if (event === null || event === undefined) return;
+
         try {
-          const data = JSON.parse(event.data);
+          const data = JSON.parse(event);
           switch (stream) {
             case 'ticker':
               server.emit(stream, this.transformTickerData(data));
@@ -51,23 +55,9 @@ export class BinanceService {
         } catch (error) {
           this.logger.error(`Stream ${stream} - error parsing message: ${error}`);
         }
-      };
+      });
       this.wsConnections.push(ws);
     });
-
-    const futuresKline = new WebSocket(`${this.futuresWSBase}/btcusdt@kline_1m`);
-    futuresKline.onmessage = (event) => {
-      if (event.data === null || event.data === undefined) {
-        this.logger.warn('Futures kline - event.data was null or undefined');
-        return;
-      }
-      try {
-        const data = JSON.parse(event.data);
-        server.emit('futuresKline', this.transformKlineData(data));
-      } catch (error) {
-        this.logger.error('Futures kline - error parsing message: ' + error);
-      }
-    };
   }
 
   // Transformation methods
